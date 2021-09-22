@@ -38,21 +38,26 @@ class CallConnection extends CallManager implements SipUaHelperListener {
   /// Called when the user voice status changes.
   void _onUserVoiceStatusChanged(UserVoiceStatus status) {
     if (status == UserVoiceStatus.echo_test) {
+      Log.info("[VoiceConnection] inside echo test with status $status");
       _doEchoTest();
     } else if (status == UserVoiceStatus.connected) {
+      Log.info("[VoiceConnection] inside Connected with status $status");
       _call.mute(true, false);
-
       _provider.snackbarCubit.sendSnack("audio.connected.snackbar");
+    } else {
+      Log.info("[VoiceConnection] inside else with status $status");
     }
   }
 
   void connect() {
     _currentTransportScheme = Preferences().lastSuccessfulTransportSchemeForSIP;
+    String lastatsus = Preferences().lastSuccessfulTransportSchemeForSIP;
+    Log.info(
+        "[VoiceConnection] Prefrence lastsuccessfulTransportSchemeForSIP $lastatsus");
     Log.info(
         "[VoiceConnection] Trying to connect to audio using transport scheme '$_currentTransportScheme'");
 
     helper.start(super.buildSettings(transportScheme: _currentTransportScheme));
-
     _muteEventSub = _provider.muteBloc.listen(_onMuteStateChange);
     _userVoiceStatusStreamSub =
         _provider.userVoiceStatusBloc.listen(_onUserVoiceStatusChanged);
@@ -69,7 +74,6 @@ class CallConnection extends CallManager implements SipUaHelperListener {
 
   void disconnect() {
     helper.stop();
-
     _muteEventSub.cancel();
     _userVoiceStatusStreamSub.cancel();
   }
@@ -77,6 +81,8 @@ class CallConnection extends CallManager implements SipUaHelperListener {
   /// Attempt a reconnect.
   void reconnect({String transportScheme}) {
     _currentTransportScheme = transportScheme;
+    Log.info(
+        "[VoiceConnection] reconnect _currentTransportScheme $_currentTransportScheme");
     helper.stop();
     helper.start(super.buildSettings(transportScheme: transportScheme));
   }
@@ -84,7 +90,6 @@ class CallConnection extends CallManager implements SipUaHelperListener {
   @override
   void callStateChanged(Call call, CallState state) {
     Log.info("[VoiceConnection] SIP call state changed to ${state.state}");
-
     _call = call;
     switch (state.state) {
       case CallStateEnum.CONFIRMED:
@@ -93,7 +98,7 @@ class CallConnection extends CallManager implements SipUaHelperListener {
         Preferences().lastSuccessfulTransportSchemeForSIP =
             _currentTransportScheme;
         Log.info(
-            "[CallConnection] Saved last successful transport scheme for the voice connection to '${Preferences().lastSuccessfulTransportSchemeForSIP}'");
+            "[VoiceConnection] Saved last successful transport scheme for the voice connection to '${Preferences().lastSuccessfulTransportSchemeForSIP}'");
         break;
       case CallStateEnum.MUTED:
         _provider.muteBloc.add(MuteEvent.MUTED);
@@ -106,17 +111,14 @@ class CallConnection extends CallManager implements SipUaHelperListener {
         if (!_echoTestDone) {
           if (_retryAfterFailedCount <= 0) {
             _retryAfterFailedCount++;
-
             // Find other transport scheme to use
             //   String otherTransportScheme =
             // _currentTransportScheme == "wss" ? "ws" : "wss";
-            String otherTransportScheme = _currentTransportScheme = "ws";
+            String otherTransportScheme = _currentTransportScheme = "wss";
             Log.warning(
                 "[VoiceConnection] Failed before echo test has been done -> Retrying with another configuration '$otherTransportScheme'");
-
             _provider.snackbarCubit
                 .sendSnack("audio.connection-failed.retry.snackbar");
-
             /*
             We experienced problems with BBB Server version 2.2.31 where
             the official web app would make the request using the WSS protocol,
